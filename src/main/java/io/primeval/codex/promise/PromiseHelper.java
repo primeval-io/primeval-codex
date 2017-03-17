@@ -32,7 +32,8 @@ public final class PromiseHelper {
         }, onSuccess, onError);
     }
 
-    public static <T> void onResolve(Promise<T> promise, Runnable runOnResolve, Consumer<T> onSuccess, Consumer<Throwable> onError) {
+    public static <T> void onResolve(Promise<T> promise, Runnable runOnResolve, Consumer<T> onSuccess,
+            Consumer<Throwable> onError) {
         promise.onResolve(() -> {
             runOnResolve.run();
             try {
@@ -63,7 +64,8 @@ public final class PromiseHelper {
         return wrapPromise(Function.identity(), callable);
     }
 
-    public static <T> Promise<T> wrapPromise(Function<Throwable, Throwable> wrapException, Callable<Promise<T>> callable) {
+    public static <T> Promise<T> wrapPromise(Function<Throwable, Throwable> wrapException,
+            Callable<Promise<T>> callable) {
         try {
             return callable.call();
         } catch (Throwable e) {
@@ -116,7 +118,8 @@ public final class PromiseHelper {
     }
 
     @SuppressWarnings("unchecked")
-    public static <T, U extends Throwable> T recoverFrom(Promise<?> resolvedPromise, Class<U> throwableClass, Function<U, T> recovery) {
+    public static <T, U extends Throwable> T recoverFrom(Promise<?> resolvedPromise, Class<U> throwableClass,
+            Function<U, T> recovery) {
         Throwable failure = getFailure(resolvedPromise);
         if (throwableClass.isAssignableFrom(failure.getClass())) {
             return recovery.apply((U) failure);
@@ -125,7 +128,8 @@ public final class PromiseHelper {
     }
 
     @SuppressWarnings("unchecked")
-    public static <T, U extends Throwable> Promise<T> recoverFromWith(Promise<?> resolvedPromise, Class<U> throwableClass,
+    public static <T, U extends Throwable> Promise<T> recoverFromWith(Promise<?> resolvedPromise,
+            Class<U> throwableClass,
             Function<U, Promise<T>> recovery) {
         Throwable failure = getFailure(resolvedPromise);
         if (throwableClass.isAssignableFrom(failure.getClass())) {
@@ -149,6 +153,10 @@ public final class PromiseHelper {
         MonoProcessor<T> monoP = MonoProcessor.create();
         onResolve(promise, success -> monoP.onNext(success), error -> monoP.onError(error));
         return monoP;
+    }
+
+    public static <T> Mono<T> toMono(Callable<Promise<T>> promise) {
+        return Mono.fromCallable(promise).then(PromiseHelper::toMono);
     }
 
     public static <T> Promise<T> fromMono(Mono<T> mono) {
