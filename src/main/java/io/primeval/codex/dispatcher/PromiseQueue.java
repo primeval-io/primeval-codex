@@ -4,7 +4,6 @@ import java.util.Queue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.function.Function;
 
 import org.osgi.util.promise.Deferred;
@@ -56,9 +55,9 @@ public final class PromiseQueue<T> {
 
     /** The running jobs. */
     volatile int runningJobs;
-    @SuppressWarnings("rawtypes")
-    static final AtomicIntegerFieldUpdater<PromiseQueue> RUNNING_JOBS =
-            AtomicIntegerFieldUpdater.newUpdater(PromiseQueue.class, "runningJobs");
+
+    /** The queued jobs. */
+    volatile int queuedJobs;
 
     /** The concurrency. */
     private final int concurrency;
@@ -95,11 +94,13 @@ public final class PromiseQueue<T> {
      */
     public synchronized Promise<T> dispatch(Callable<T> fun) {
         Deferred<T> def = new Deferred<>();
-        if (maxQueueSize > 0 && runningJobs > maxQueueSize) {
+        int q = queuedJobs;
+        if (maxQueueSize > 0 && q >= maxQueueSize) {
             return Promises.failed(new RejectedExecutionException("max job count reached"));
         }
+        queuedJobs = q + 1;
         jobs.offer(new QueueJob<>(fun, def));
-        dispatchNext();
+        dispatchNext(false);
         return def.getPromise();
     }
 
@@ -109,23 +110,31 @@ public final class PromiseQueue<T> {
      * @param jobCount
      *            the job count
      */
-    private synchronized void dispatchNext() {
-        if (runningJobs < concurrency) {
+    private synchronized void dispatchNext(boolean jobDone) {
+        int r = runningJobs;
+        if (jobDone) {
+            runningJobs = --r;
+        }
+        if (r < concurrency) {
             QueueJob<T> job = jobs.poll();
             if (job == null) {
                 return;
             }
-            RUNNING_JOBS.incrementAndGet(this);
+            queuedJobs--;
+            runningJobs = r + 1;
             Promise<T> promise = dispatcher.apply(job.function);
             PromiseHelper.onResolve(promise, () -> {
-                RUNNING_JOBS.decrementAndGet(this);
-                dispatchNext();
+                dispatchNext(true);
             }, job.deferred::resolve, job.deferred::fail);
         }
     }
 
     public int currentJobCount() {
         return runningJobs;
+    }
+
+    public int queuedJobCount() {
+        return queuedJobs;
     }
 
 }

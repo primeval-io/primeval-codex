@@ -21,12 +21,31 @@ public class PromiseQueueTest {
 
     @Rule
     public Timeout globalTimeout = Timeout.seconds(120);
-
+    
+    
     @Test
-    public void test() throws Exception {
+    public void testUnboundedQueue() throws Exception {
         PromiseQueue<Integer> promiseQueue = new PromiseQueue<>(wCodex.getDispatcher()::dispatch, 6, 0);
         List<Promise<Integer>> pmsList = new ArrayList<>();
-        for (int i = 0; i < 30; i++) {
+        for (int i = 0; i < 100; i++) {
+            int j = i;
+            Promise<Integer> promise = promiseQueue.dispatch(() -> {
+                long sleepTime = sleepTime();
+                Thread.sleep(sleepTime);
+                return j;
+            });
+            pmsList.add(promise);
+        }
+        Promise<List<Integer>> list = Promises.all(pmsList);
+
+        Assertions.assertThat(list.getValue()).isNotNull();
+    }
+
+    @Test
+    public void testBoundedQueue() throws Exception {
+        PromiseQueue<Integer> promiseQueue = new PromiseQueue<>(wCodex.getDispatcher()::dispatch, 6, 20);
+        List<Promise<Integer>> pmsList = new ArrayList<>();
+        for (int i = 0; i < 25; i++) {
             int j = i;
             Promise<Integer> promise = promiseQueue.dispatch(() -> {
                 long sleepTime = sleepTime();
