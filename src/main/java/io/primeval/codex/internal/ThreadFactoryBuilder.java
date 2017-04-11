@@ -24,22 +24,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * A ThreadFactory builder, providing any combination of these features:
- * <ul>
- * <li>whether threads should be marked as {@linkplain Thread#setDaemon daemon} threads
- * <li>a {@linkplain ThreadFactoryBuilder#setNameFormat naming format}
- * <li>a {@linkplain Thread#setPriority thread priority}
- * <li>an {@linkplain Thread#setUncaughtExceptionHandler uncaught exception handler}
- * <li>a {@linkplain ThreadFactory#newThread backing thread factory}
- * </ul>
- * <p>
- * If no backing thread factory is provided, a default backing thread factory is used as if by calling
- * {@code setThreadFactory(}{@link Executors#defaultThreadFactory()}{@code )}.
- *
- * @author Kurt Alfred Kluever
- * @since 4.0
- */
 public final class ThreadFactoryBuilder {
     private String nameFormat = null;
     private Boolean daemon = null;
@@ -53,15 +37,6 @@ public final class ThreadFactoryBuilder {
     public ThreadFactoryBuilder() {
     }
 
-    /**
-     * Sets the naming format to use when naming threads ({@link Thread#setName}) which are created with this ThreadFactory.
-     *
-     * @param nameFormat
-     *            a {@link String#format(String, Object...)}-compatible format String, to which a unique integer (0, 1, etc.) will be supplied as the single
-     *            parameter. This integer will be unique to the built instance of the ThreadFactory and will be assigned sequentially. For example,
-     *            {@code "rpc-pool-%d"} will generate thread names like {@code "rpc-pool-0"}, {@code "rpc-pool-1"}, {@code "rpc-pool-2"}, etc.
-     * @return this for the builder pattern
-     */
     public ThreadFactoryBuilder setNameFormat(String nameFormat) {
         String.format(nameFormat, 0); // fail fast if the format is bad or null
         this.nameFormat = nameFormat;
@@ -119,7 +94,6 @@ public final class ThreadFactoryBuilder {
      *            the backing {@link ThreadFactory} which will be delegated to during thread creation.
      * @return this for the builder pattern
      *
-     * @see MoreExecutors
      */
     public ThreadFactoryBuilder setThreadFactory(
             ThreadFactory backingThreadFactory) {
