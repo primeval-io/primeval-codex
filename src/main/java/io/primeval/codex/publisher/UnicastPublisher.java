@@ -3,17 +3,17 @@ package io.primeval.codex.publisher;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 
-import reactor.core.publisher.BlockingSink;
+import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.UnicastProcessor;
 
 public final class UnicastPublisher<T> implements Publisher<T> {
 
-    private final BlockingSink<T> sink;
+    private final FluxSink<T> sink;
     private final UnicastProcessor<T> emitter;
 
     public UnicastPublisher() {
         emitter = UnicastProcessor.create();
-        this.sink = emitter.connectSink();
+        this.sink = emitter.sink();
     }
 
     public void complete() {
