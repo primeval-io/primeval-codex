@@ -1,52 +1,44 @@
-package io.primeval.codex.file.impl;
+package io.primeval.codex.io.impl;
 
-import java.io.BufferedReader;
+import static io.primeval.codex.io.impl.FileCompareTestUtils.compareReactiveFileReadToFile;
+
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
-import java.nio.charset.Charset;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import org.assertj.core.api.Assertions;
-import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
+import org.junit.rules.RuleChain;
 
-import io.primeval.codex.file.ReactiveFile;
+import io.primeval.codex.io.file.ReactiveFile;
 import io.primeval.codex.test.rules.WithCodex;
-import io.primeval.common.bytebuffer.ByteBufferListInputStream;
+import io.primeval.codex.test.rules.WithCodexIO;
 import reactor.core.publisher.Flux;
 
 public class ReactiveFileReaderImplTest {
 
-    private static ReactiveFileReaderImpl reactiveFileReaderImpl;
+    private static ReactiveFileReaderImpl tested;
+
+    public static WithCodex withCodex = new WithCodex();
+
+    public static WithCodexIO withCodexIO = new WithCodexIO(withCodex);
 
     @ClassRule
-    public static WithCodex withCodex = new WithCodex();
+    public static RuleChain chain = RuleChain.outerRule(withCodex).around(withCodexIO);
 
     @BeforeClass
     public static void setUp() {
-        reactiveFileReaderImpl = new ReactiveFileReaderImpl();
-        reactiveFileReaderImpl.setDetachedDispatcherManager(withCodex.getDetachedDispatcherManager());
-        reactiveFileReaderImpl.activate();
-    }
-
-    @AfterClass
-    public static void tearDown() {
-        reactiveFileReaderImpl.deactivate();
+        tested = withCodexIO.getReactiveFileReader();
     }
 
     @Test
     public void shouldReadFileLocked() throws Exception {
         int bufferSize = 1024;
         File file = new File(ReactiveFileReaderImplTest.class.getResource("/LICENSE").getFile());
-        try (ReactiveFile reactiveFile = reactiveFileReaderImpl
+        try (ReactiveFile reactiveFile = tested
                 .readLocked(file.toPath(), ByteBuffer::allocate, bufferSize)
                 .getValue()) {
             compareReactiveFileReadToFile(bufferSize, file, reactiveFile);
@@ -57,7 +49,7 @@ public class ReactiveFileReaderImplTest {
     public void shouldReadFileUnlocked() throws Exception {
         int bufferSize = 2048;
         File file = new File(ReactiveFileReaderImplTest.class.getResource("/LICENSE").getFile());
-        try (ReactiveFile reactiveFile = reactiveFileReaderImpl.read(file.toPath(), ByteBuffer::allocate, bufferSize)
+        try (ReactiveFile reactiveFile = tested.read(file.toPath(), ByteBuffer::allocate, bufferSize)
                 .getValue()) {
             compareReactiveFileReadToFile(bufferSize, file, reactiveFile);
         }
@@ -67,7 +59,7 @@ public class ReactiveFileReaderImplTest {
     public void shouldReadFilePart() throws Exception {
         int bufferSize = 2048;
         File file = new File(ReactiveFileReaderImplTest.class.getResource("/LICENSE").getFile());
-        ReactiveFile reactiveFile = reactiveFileReaderImpl.read(file.toPath(), ByteBuffer::allocate, bufferSize)
+        ReactiveFile reactiveFile = tested.read(file.toPath(), ByteBuffer::allocate, bufferSize)
                 .getValue();
         Assertions.assertThat(reactiveFile.isOpen()).isTrue();
         Flux<ByteBuffer> flux = Flux.from(reactiveFile.content());
@@ -90,30 +82,11 @@ public class ReactiveFileReaderImplTest {
     public void shouldReadFileUnlockedOffheap() throws Exception {
         int bufferSize = 2048;
         File file = new File(ReactiveFileReaderImplTest.class.getResource("/LICENSE").getFile());
-        try (ReactiveFile reactiveFile = reactiveFileReaderImpl
+        try (ReactiveFile reactiveFile = tested
                 .read(file.toPath(), ByteBuffer::allocateDirect, bufferSize)
                 .getValue()) {
             compareReactiveFileReadToFile(bufferSize, file, reactiveFile);
         }
     }
 
-    private void compareReactiveFileReadToFile(int bufferSize, File file, ReactiveFile reactiveFile)
-            throws IOException, FileNotFoundException {
-        long length = reactiveFile.length();
-        Assertions.assertThat(length).isEqualTo(file.length());
-        List<ByteBuffer> bb = Flux.from(reactiveFile.content()).collectList().block();
-        Assertions.assertThat(bb).hasSize((int) (length / bufferSize) + (length % bufferSize == 0 ? 0 : 1));
-        Charset utf8Charset = Charset.forName("utf-8");
-        try (BufferedReader brActual = new BufferedReader(
-                new InputStreamReader(new ByteBufferListInputStream(bb), utf8Charset));
-                BufferedReader brExpected = new BufferedReader(
-                        new InputStreamReader(new FileInputStream(file), utf8Charset));) {
-            String lineActual = null, lineExpected = null;
-            while (((lineActual = brActual.readLine()) != null || lineActual == null)
-                    && (lineExpected = brExpected.readLine()) != null) {
-                Assertions.assertThat(lineActual).isEqualTo(lineExpected);
-            }
-            Assertions.assertThat(lineActual).isEqualTo(lineExpected).isNull();
-        }
-    }
 }

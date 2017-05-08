@@ -1,5 +1,6 @@
-package io.primeval.codex.file.impl;
+package io.primeval.codex.io.impl;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousFileChannel;
 import java.nio.channels.CompletionHandler;
@@ -12,9 +13,7 @@ import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
 
-import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
-import org.osgi.service.component.annotations.Deactivate;
 import org.osgi.service.component.annotations.Reference;
 import org.osgi.util.promise.Deferred;
 import org.osgi.util.promise.Promise;
@@ -22,10 +21,9 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.primeval.codex.dispatcher.DetachedDispatcher;
-import io.primeval.codex.dispatcher.DetachedDispatcherManager;
-import io.primeval.codex.file.ReactiveFile;
-import io.primeval.codex.file.ReactiveFileReader;
+import io.primeval.codex.io.IODispatcher;
+import io.primeval.codex.io.file.ReactiveFile;
+import io.primeval.codex.io.file.ReactiveFileReader;
 import io.primeval.codex.promise.PromiseHelper;
 import io.primeval.codex.util.Procedure;
 import reactor.core.publisher.Mono;
@@ -35,37 +33,33 @@ import reactor.core.publisher.MonoProcessor;
 public final class ReactiveFileReaderImpl implements ReactiveFileReader {
     static final Logger LOGGER = LoggerFactory.getLogger(ReactiveFileReaderImpl.class);
 
-    private DetachedDispatcherManager detachedDispatcherManager;
-    private DetachedDispatcher detachedDispatcher;
-
-    @Activate
-    public void activate() {
-        detachedDispatcher = detachedDispatcherManager.create("reactive-files", 0, 5);
-    }
-
-    @Deactivate
-    public void deactivate() {
-        detachedDispatcher.close();
-    }
+    private IODispatcher ioDispatcher;
 
     @Override
     public Promise<ReactiveFile> read(Path path, IntFunction<ByteBuffer> byteBufferFactory, int bufferSize) {
-        return detachedDispatcher.dispatch(() -> {
-            AsynchronousFileChannel fileChannel = AsynchronousFileChannel.open(path, StandardOpenOption.READ);
-            long fileLength = fileChannel.size();
-
-            return createReactiveFile(path, byteBufferFactory, bufferSize, fileChannel, fileLength, Procedure.NOOP);
+        return ioDispatcher.dispatch(() -> {
+            return getReactiveFileBlocking(ioDispatcher, path, byteBufferFactory, bufferSize);
         });
+    }
+
+    static ReactiveFile getReactiveFileBlocking(IODispatcher ioDispatcher, Path path,
+            IntFunction<ByteBuffer> byteBufferFactory, int bufferSize)
+            throws IOException {
+        AsynchronousFileChannel fileChannel = AsynchronousFileChannel.open(path, StandardOpenOption.READ);
+        long fileLength = fileChannel.size();
+
+        return createReactiveFile(ioDispatcher, path, byteBufferFactory, bufferSize, fileChannel, fileLength,
+                Procedure.NOOP);
     }
 
     @Override
     public Promise<ReactiveFile> readLocked(Path path, IntFunction<ByteBuffer> byteBufferFactory, int bufferSize) {
-        return detachedDispatcher.dispatch(() -> {
+        return ioDispatcher.dispatch(() -> {
             AsynchronousFileChannel fileChannel = AsynchronousFileChannel.open(path, StandardOpenOption.READ);
             long fileLength = fileChannel.size();
 
             return lock(fileChannel).map(lock -> {
-                return createReactiveFile(path, byteBufferFactory, bufferSize, fileChannel, fileLength,
+                return createReactiveFile(ioDispatcher, path, byteBufferFactory, bufferSize, fileChannel, fileLength,
                         lock::release);
 
             });
@@ -94,10 +88,11 @@ public final class ReactiveFileReaderImpl implements ReactiveFileReader {
         return deferred.getPromise();
     }
 
-    private ReactiveFile createReactiveFile(Path path, IntFunction<ByteBuffer> byteBufferFactory, int bufferSize,
+    private static ReactiveFile createReactiveFile(IODispatcher ioDispatcher, Path path,
+            IntFunction<ByteBuffer> byteBufferFactory, int bufferSize,
             AsynchronousFileChannel fileChannel, long fileLength, Procedure cleanUp) {
 
-        AsynchronousFileHandler fileHandler = new AsynchronousFileHandler(detachedDispatcher, fileChannel,
+        AsynchronousFileHandler fileHandler = new AsynchronousFileHandler(ioDispatcher, fileChannel,
                 byteBufferFactory,
                 fileLength, bufferSize);
 
@@ -113,8 +108,8 @@ public final class ReactiveFileReaderImpl implements ReactiveFileReader {
     }
 
     @Reference
-    public void setDetachedDispatcherManager(DetachedDispatcherManager detachedDispatcherManager) {
-        this.detachedDispatcherManager = detachedDispatcherManager;
+    public void setIODispatcher(IODispatcher ioDispatcher) {
+        this.ioDispatcher = ioDispatcher;
 
     }
 }
@@ -125,12 +120,12 @@ final class AsynchronousFileHandler {
     public final long fileLength;
     public final int buffersize;
 
-    private final DetachedDispatcher dispatcher;
+    private final IODispatcher dispatcher;
     private final AsynchronousFileChannel channel;
 
     private volatile boolean closed = false;
 
-    public AsynchronousFileHandler(DetachedDispatcher dispatcher, AsynchronousFileChannel channel,
+    public AsynchronousFileHandler(IODispatcher dispatcher, AsynchronousFileChannel channel,
             IntFunction<ByteBuffer> byteBufferFactory, long fileLength, int buffersize) {
         this.dispatcher = dispatcher;
         this.channel = channel;

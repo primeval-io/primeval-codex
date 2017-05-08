@@ -30,6 +30,12 @@
 			<artifactId>primeval-commons</artifactId>
 			<version>${primeval-commons.version}</version>
 		</dependency>
+		
+		<dependency>
+			<groupId>org.osgi</groupId>
+			<artifactId>org.osgi.core</artifactId>
+			<version>6.0.0</version>
+		</dependency>
 
 		<dependency>
 			<groupId>org.slf4j</groupId>

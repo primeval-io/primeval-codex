@@ -1,4 +1,4 @@
-package io.primeval.codex.file.impl;
+package io.primeval.codex.io.impl;
 
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
@@ -8,7 +8,7 @@ import java.util.function.Supplier;
 
 import org.reactivestreams.Publisher;
 
-import io.primeval.codex.file.ReactiveFile;
+import io.primeval.codex.io.file.ReactiveFile;
 import io.primeval.codex.util.Procedure;
 
 public final class ReactiveFileImpl implements ReactiveFile {

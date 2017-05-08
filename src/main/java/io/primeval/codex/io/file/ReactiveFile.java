@@ -1,4 +1,4 @@
-package io.primeval.codex.file;
+package io.primeval.codex.io.file;
 
 import java.nio.ByteBuffer;
 import java.nio.file.Path;

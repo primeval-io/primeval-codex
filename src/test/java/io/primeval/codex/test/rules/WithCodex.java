@@ -28,6 +28,7 @@ public final class WithCodex extends ExternalResource implements TestResource {
         detachedDispatcherManagerImpl = new DetachedDispatcherManagerImpl();
         detachedDispatcherManagerImpl.setDispatcher(dispatcherImpl);
         detachedDispatcherManagerImpl.setExecutionContextManager(executionContextManagerImpl);
+
     }
 
     @Override
@@ -55,4 +56,5 @@ public final class WithCodex extends ExternalResource implements TestResource {
     public DetachedDispatcherManager getDetachedDispatcherManager() {
         return detachedDispatcherManagerImpl;
     }
+
 }
