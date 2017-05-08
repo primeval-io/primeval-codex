@@ -34,8 +34,13 @@ public interface ReactiveFileReader {
      */
     Promise<ReactiveFile> readLocked(Path path, IntFunction<ByteBuffer> byteBufferFactory, int bufferSize);
 
+    
+    default Promise<ReactiveFile> read(Path path) {
+        return read(path, ByteBuffer::allocate, DEFAULT_BUFFER_SIZE);
+    }
+    
     default Promise<ReactiveFile> read(File file) {
-        return read(file.toPath(), ByteBuffer::allocate, DEFAULT_BUFFER_SIZE);
+        return read(file.toPath());
     }
 
 }
