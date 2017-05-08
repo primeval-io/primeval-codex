@@ -39,6 +39,8 @@ public class PromiseQueueTest {
         Promise<List<Integer>> list = Promises.all(pmsList);
 
         Assertions.assertThat(list.getValue()).isNotNull();
+        
+        list.getValue();
     }
 
     @Test
@@ -57,6 +59,8 @@ public class PromiseQueueTest {
         Promise<List<Integer>> list = Promises.all(pmsList);
 
         Assertions.assertThat(list.getValue()).isNotNull();
+        
+        list.getValue();
     }
 
     private long sleepTime() {
