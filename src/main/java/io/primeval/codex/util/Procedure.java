@@ -5,6 +5,8 @@ import java.util.function.Function;
 @FunctionalInterface
 public interface Procedure {
 
+    public static final Procedure NOOP = () -> {};
+
     void call() throws Exception;
 
     public static Procedure fromRunnable(Runnable r) {
