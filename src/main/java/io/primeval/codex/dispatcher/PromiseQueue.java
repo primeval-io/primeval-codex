@@ -70,6 +70,10 @@ public final class PromiseQueue<T> {
 
     /**
      * Instantiates a new promise queue.
+     * 
+     * The dispatcher function will be used to dispatch jobs. Queued jobs will be triggered when running jobs are resolved, by default in their thread. It is
+     * thus advised to make sure the dispatch takes place in a new thread, for instance by using a handle to {@link Dispatcher#dispatch(Callable)} as dispatcher
+     * function.
      *
      * @param dispatcher
      *            the dispatcher
