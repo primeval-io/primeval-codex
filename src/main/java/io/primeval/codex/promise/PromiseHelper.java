@@ -15,6 +15,7 @@ import org.osgi.util.promise.FailedPromisesException;
 import org.osgi.util.promise.Promise;
 import org.osgi.util.promise.Promises;
 
+import io.primeval.common.function.FallibleFunction;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoProcessor;
 
@@ -86,6 +87,18 @@ public final class PromiseHelper {
     public static <T> void onFailure(Promise<T> promise, Consumer<Throwable> onFailure) {
         onResolve(promise, t -> {
         }, onFailure);
+    }
+
+    public static <T, R> Promise<R> mapFallible(Promise<T> p, FallibleFunction<T, R> fun) {
+        return p.flatMap(succ -> {
+            Deferred<R> chained = new Deferred<R>();
+            try {
+                chained.resolve(fun.apply(succ));
+            } catch (Throwable e) {
+                chained.fail(e);
+            }
+            return chained.getPromise();
+        });
     }
 
     public static <T> Promise<List<T>> allSuccessful(List<Promise<T>> promises) {
