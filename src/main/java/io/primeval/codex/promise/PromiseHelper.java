@@ -1,20 +1,26 @@
 package io.primeval.codex.promise;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 
 import org.osgi.util.promise.Deferred;
 import org.osgi.util.promise.FailedPromisesException;
 import org.osgi.util.promise.Promise;
 import org.osgi.util.promise.Promises;
 
+import io.primeval.codex.util.Procedure;
 import io.primeval.common.function.FallibleFunction;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoProcessor;
@@ -51,6 +57,13 @@ public final class PromiseHelper {
 
     public static <T> Promise<T> wrap(Callable<T> callable) {
         return wrap(Function.identity(), callable);
+    }
+
+    public static Promise<Void> wrap(Procedure procedure) {
+        return wrap(Function.identity(), () -> {
+            procedure.call();
+            return null;
+        });
     }
 
     public static <T> Promise<T> wrap(Function<Throwable, Throwable> wrapException, Callable<T> callable) {
@@ -168,8 +181,24 @@ public final class PromiseHelper {
         return monoP;
     }
 
+    public static <T> Mono<T> toMonoOptional(Promise<Optional<T>> promise) {
+        MonoProcessor<T> monoP = MonoProcessor.create();
+        onResolve(promise, success -> {
+            if (success.isPresent()) {
+                monoP.onNext(success.get());
+            } else {
+                monoP.onComplete();
+            }
+        }, error -> monoP.onError(error));
+        return monoP;
+    }
+
     public static <T> Mono<T> toMono(Callable<Promise<T>> promise) {
         return Mono.fromCallable(promise).then(PromiseHelper::toMono);
+    }
+
+    public static <T> Mono<T> toMonoOptional(Callable<Promise<Optional<T>>> promise) {
+        return Mono.fromCallable(promise).then(PromiseHelper::toMonoOptional);
     }
 
     public static <T> Promise<T> fromMono(Mono<T> mono) {
@@ -182,6 +211,29 @@ public final class PromiseHelper {
             }
         }).subscribe();
         return deferred.getPromise();
+    }
+
+    public static <T> Promise<Optional<T>> fromMonoOptional(Mono<T> mono) {
+        return fromMono(mono).map(Optional::ofNullable);
+    }
+
+    public static <T> Collector<Promise<T>, ?, Promise<List<T>>> collector() {
+        return Collector.<Promise<T>, ArrayList<Promise<T>>, Promise<List<T>>> of(
+                ArrayList::new,
+                ArrayList::add,
+                (left, right) -> {
+                    left.addAll(right);
+                    return left;
+                },
+                builder -> Promises.all(builder));
+    }
+
+    public static <T, U> Promise<Map<T, U>> allMap(Map<T, Promise<U>> input) {
+        Promise<List<Map.Entry<T, U>>> pms = Promises
+                .all(input.entrySet()
+                        .stream().map(e -> e.getValue().map(p -> new AbstractMap.SimpleImmutableEntry<>(e.getKey(), p)))
+                        .collect(Collectors.toList()));
+        return pms.map(l -> l.stream().collect(Collectors.<Map.Entry<T, U>, T, U> toMap(e -> e.getKey(), e -> e.getValue())));
     }
 
 }
