@@ -77,6 +77,9 @@ public final class ResourceFinderReaderImpl implements ResourceFinder, ReactiveR
             throws URISyntaxException {
         return PromiseHelper.wrap(() -> {
             URL resource = classLoader.getResource(resourcePath);
+            if (resource == null) {
+                throw new FileNotFoundException(resourcePath.toString());
+            }
             return Paths.get(resource.toURI());
         });
     }
