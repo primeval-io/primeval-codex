@@ -64,6 +64,6 @@ public final class ExecutionContextManagerImpl implements ExecutionContextManage
     }
 
     public void removeExecutionContextHook(ExecutionContextHook executionContextHook) {
-        executionContextHooks.remove(executionContextHooks);
+        executionContextHooks.remove(executionContextHook);
     }
 }
