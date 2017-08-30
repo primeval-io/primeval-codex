@@ -102,7 +102,7 @@ public final class PromiseHelper {
         }, onFailure);
     }
 
-    public static <T, R> Promise<R> mapFallible(Promise<T> p, FallibleFunction<T, R> fun) {
+    public static <T, R, E extends Throwable> Promise<R> mapFallible(Promise<T> p, FallibleFunction<T, R, E> fun) {
         return p.flatMap(succ -> {
             Deferred<R> chained = new Deferred<R>();
             try {
