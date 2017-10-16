@@ -25,22 +25,27 @@ public final class DetachedDispatcherImpl implements DetachedDispatcher {
     private final ExecutionContextManager executionContextManager;
     private final Dispatcher dispatcher;
 
-    public DetachedDispatcherImpl(Dispatcher dispatcher, ExecutionContextManager executionContextManager, String name, int minThreads,
-            int maxThreads) {
+    public DetachedDispatcherImpl(Dispatcher dispatcher, ExecutionContextManager executionContextManager, String name,
+            int minThreads, int maxThreads) {
         this.dispatcher = dispatcher;
         this.executionContextManager = executionContextManager;
         LinkedBlockingDeque<Runnable> queue = new LinkedBlockingDeque<>();
-          
-        ThreadPoolExecutor threadPool = new ThreadPoolExecutor(minThreads, maxThreads, 10, TimeUnit.SECONDS, queue,
-                new ThreadFactoryBuilder().setNameFormat(name + "-pool-%d").setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
 
-                    @Override
-                    public void uncaughtException(Thread t, Throwable e) {
-                        LOGGER.error("Uncaught error in thread {}", t, e);
-                    }
-                }).build(), new RejectedExecutionHandler() {
+        ThreadPoolExecutor threadPool = new ThreadPoolExecutor(minThreads, maxThreads, 10, TimeUnit.SECONDS, queue,
+                new ThreadFactoryBuilder().setNameFormat(name + "-pool-%d")
+                        .setUncaughtExceptionHandler(new UncaughtExceptionHandler() {
+
+                            @Override
+                            public void uncaughtException(Thread t, Throwable e) {
+                                LOGGER.error("Uncaught error in thread {}", t, e);
+                            }
+                        }).build(),
+                new RejectedExecutionHandler() {
                     public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
-                        // this will block if the queue is full, which is unlikely since it is virtually unbounded...!
+                        // this will block if the queue is full, which is
+                        // unlikely since it is virtually
+                        // unbounded...! (rethink this, unbounded queues &
+                        // blocking are evil!)
                         try {
                             executor.getQueue().put(r);
                         } catch (InterruptedException e) {
@@ -60,28 +65,38 @@ public final class DetachedDispatcherImpl implements DetachedDispatcher {
 
     @Override
     public <T> CancelablePromise<T> dispatch(Callable<T> task, boolean inheritExecutionContext) {
-        CancelablePromise<T> dispatchedPromise = Dispatchers.dispatch(executor, executionContextManager, task, inheritExecutionContext);
+        CancelablePromise<T> dispatchedPromise = Dispatchers.dispatch(executor, executionContextManager, task,
+                inheritExecutionContext);
 
-        // Bridge the promise resolution callback back to the non-blocking dispatcher!
+        // Bridge the promise resolution callback back to the non-blocking
+        // dispatcher!
         Deferred<T> deferred = new Deferred<>();
-        dispatchedPromise.onResolve(() -> {
-            dispatcher.execute(() -> {
-                deferred.resolveWith(dispatchedPromise);
-            } , inheritExecutionContext);
-        });
 
-        return new DelegatingCancelablePromise<T>(deferred.getPromise()) {
+        DelegatingCancelablePromise<T> cancelablePromise = new DelegatingCancelablePromise<T>(deferred.getPromise()) {
             @Override
             public boolean cancel(String reason, boolean tryToInterrupt) {
                 return dispatchedPromise.cancel(reason, tryToInterrupt);
             }
         };
+
+        dispatchedPromise.onResolve(() -> {
+            try {
+                dispatcher.execute(() -> {
+                    deferred.resolveWith(dispatchedPromise);
+                }, inheritExecutionContext);
+            } catch (RejectedExecutionException rej) {
+                LOGGER.warn(
+                        "Cannot bridge promise: the main non-blocking dispatcher is rejecting tasks (shutdown?)");
+            }
+        });
+
+        return cancelablePromise;
     }
 
     @Override
-    public <T> List<CancelablePromise<T>> dispatchAll(List<? extends Callable<T>> tasks, boolean inheritExecutionContext) {
-        return Dispatchers.dispatchAll(task -> dispatch(task, inheritExecutionContext), tasks,
-                inheritExecutionContext);
+    public <T> List<CancelablePromise<T>> dispatchAll(List<? extends Callable<T>> tasks,
+            boolean inheritExecutionContext) {
+        return Dispatchers.dispatchAll(task -> dispatch(task, inheritExecutionContext), tasks, inheritExecutionContext);
     }
 
     @Override

@@ -52,11 +52,9 @@ public final class DispatcherImpl implements Dispatcher, Scheduler {
     public void deactivate() {
         if (executor != null) {
             executor.shutdown();
-            executor = null;
         }
         if (scheduler != null) {
             scheduler.shutdown();
-            scheduler = null;
         }
     }
 

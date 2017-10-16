@@ -39,7 +39,8 @@ public final class DispatcherImplTest {
     }
 
     @AfterClass
-    public static void classTearDown() {
+    public static void classTearDown() throws InterruptedException {
+        Thread.sleep(1500L);
         dispatcher.deactivate();
     }
 
