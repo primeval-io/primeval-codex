@@ -21,7 +21,7 @@
 
 	<properties>
 		<primeval-commons.version>1.1.0-SNAPSHOT</primeval-commons.version>
-		<reactor-core.version>3.0.7.RELEASE</reactor-core.version>
+		<reactor-core.version>3.1.0.RELEASE</reactor-core.version>
 	</properties>
 
 	<dependencies>
@@ -30,7 +30,7 @@
 			<artifactId>primeval-commons</artifactId>
 			<version>${primeval-commons.version}</version>
 		</dependency>
-		
+
 		<dependency>
 			<groupId>org.osgi</groupId>
 			<artifactId>org.osgi.core</artifactId>

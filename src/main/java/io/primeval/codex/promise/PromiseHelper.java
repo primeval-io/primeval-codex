@@ -194,16 +194,16 @@ public final class PromiseHelper {
     }
 
     public static <T> Mono<T> toMono(Callable<Promise<T>> promise) {
-        return Mono.fromCallable(promise).then(PromiseHelper::toMono);
+        return Mono.fromCallable(promise).flatMap(PromiseHelper::toMono);
     }
 
     public static <T> Mono<T> toMonoOptional(Callable<Promise<Optional<T>>> promise) {
-        return Mono.fromCallable(promise).then(PromiseHelper::toMonoOptional);
+        return Mono.fromCallable(promise).flatMap(PromiseHelper::toMonoOptional);
     }
 
     public static <T> Promise<T> fromMono(Mono<T> mono) {
         Deferred<T> deferred = new Deferred<>();
-        mono.doOnTerminate((value, error) -> {
+        mono.doOnSuccessOrError((value, error) -> {
             if (error != null) {
                 deferred.fail(error);
             } else {
